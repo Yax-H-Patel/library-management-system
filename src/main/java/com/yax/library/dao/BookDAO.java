@@ -8,7 +8,14 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
 
+/**
+ * Handles all database operations for the "books" table.
+ * Nothing in here should know about the console/UI - it only
+ * talks to Book objects and the database.
+ */
 public class BookDAO {
 
     /**
@@ -49,25 +56,82 @@ public class BookDAO {
         }
     }
 
+    /**
+     * Returns every book in the database, ordered by title.
+     */
+    public List<Book> getAllBooks() {
+        List<Book> books = new ArrayList<>();
+        String sql = "SELECT * FROM books ORDER BY title";
+
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+
+            while (rs.next()) {
+                books.add(mapRowToBook(rs));
+            }
+
+        } catch (SQLException e) {
+            System.out.println("Error fetching books: " + e.getMessage());
+        }
+
+        return books;
+    }
+
+    /**
+     * Finds a single book by its ID.
+     * Returns null if not found.
+     */
+    public Book getBookById(int bookId) {
+        String sql = "SELECT * FROM books WHERE book_id = ?";
+
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setInt(1, bookId);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return mapRowToBook(rs);
+                }
+            }
+
+        } catch (SQLException e) {
+            System.out.println("Error fetching book: " + e.getMessage());
+        }
+
+        return null; // not found
+    }
+
+    /**
+     * Converts one row of a ResultSet into a Book object.
+     * Pulling this into its own method avoids repeating this mapping
+     * code in every method that reads books back from the DB.
+     */
+    private Book mapRowToBook(ResultSet rs) throws SQLException {
+        return new Book(
+                rs.getInt("book_id"),
+                rs.getString("title"),
+                rs.getString("author"),
+                rs.getString("genre"),
+                rs.getString("isbn"),
+                rs.getInt("total_copies"),
+                rs.getInt("available_copies")
+        );
+    }
+
     // Quick manual test
     public static void main(String[] args) {
         BookDAO dao = new BookDAO();
 
-        Book newBook = new Book(
-                "The Pragmatic Programmer",
-                "Andrew Hunt",
-                "Programming",
-                "9780135957059",
-                2,
-                2
-        );
-
-        boolean success = dao.addBook(newBook);
-
-        if (success) {
-            System.out.println("Book added! Generated ID: " + newBook.getBookId());
-        } else {
-            System.out.println("Failed to add book.");
+        System.out.println("--- All books ---");
+        List<Book> books = dao.getAllBooks();
+        for (Book b : books) {
+            System.out.println(b); // uses Book's toString()
         }
+
+        System.out.println("\n--- Fetch book with ID 1 ---");
+        Book found = dao.getBookById(1);
+        System.out.println(found != null ? found : "No book with that ID");
     }
 }
