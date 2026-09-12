@@ -120,18 +120,103 @@ public class BookDAO {
         );
     }
 
-    // Quick manual test
+    /**
+     * Updates an existing book's details.
+     * Matches by book_id - the book must already exist.
+     */
+    public boolean updateBook(Book book) {
+        String sql = "UPDATE books SET title = ?, author = ?, genre = ?, isbn = ?, " +
+                "total_copies = ?, available_copies = ? WHERE book_id = ?";
+
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, book.getTitle());
+            stmt.setString(2, book.getAuthor());
+            stmt.setString(3, book.getGenre());
+            stmt.setString(4, book.getIsbn());
+            stmt.setInt(5, book.getTotalCopies());
+            stmt.setInt(6, book.getAvailableCopies());
+            stmt.setInt(7, book.getBookId());
+
+            int rowsAffected = stmt.executeUpdate();
+            return rowsAffected > 0;
+
+        } catch (SQLException e) {
+            System.out.println("Error updating book: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Deletes a book by ID. Returns false if no book had that ID.
+     */
+    public boolean deleteBook(int bookId) {
+        String sql = "DELETE FROM books WHERE book_id = ?";
+
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setInt(1, bookId);
+            int rowsAffected = stmt.executeUpdate();
+            return rowsAffected > 0;
+
+        } catch (SQLException e) {
+            System.out.println("Error deleting book: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Searches books where the title contains the given keyword (case-insensitive).
+     */
+    public List<Book> searchBooksByTitle(String keyword) {
+        List<Book> books = new ArrayList<>();
+        String sql = "SELECT * FROM books WHERE title LIKE ? ORDER BY title";
+
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, "%" + keyword + "%");
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    books.add(mapRowToBook(rs));
+                }
+            }
+
+        } catch (SQLException e) {
+            System.out.println("Error searching books: " + e.getMessage());
+        }
+
+        return books;
+    }
+
     public static void main(String[] args) {
         BookDAO dao = new BookDAO();
 
-        System.out.println("--- All books ---");
-        List<Book> books = dao.getAllBooks();
-        for (Book b : books) {
-            System.out.println(b); // uses Book's toString()
+        System.out.println("--- Search for 'the' ---");
+        List<Book> results = dao.searchBooksByTitle("the");
+        for (Book b : results) {
+            System.out.println(b);
         }
 
-        System.out.println("\n--- Fetch book with ID 1 ---");
-        Book found = dao.getBookById(1);
-        System.out.println(found != null ? found : "No book with that ID");
+        System.out.println("\n--- Update book ID 4 ---");
+        Book book = dao.getBookById(4);
+        if (book != null) {
+            book.setTotalCopies(5);
+            book.setAvailableCopies(5);
+            boolean updated = dao.updateBook(book);
+            System.out.println("Update success: " + updated);
+            System.out.println(dao.getBookById(4));
+        }
+
+        System.out.println("\n--- Delete book ID 4 ---");
+        boolean deleted = dao.deleteBook(4);
+        System.out.println("Delete success: " + deleted);
+        System.out.println("Remaining books:");
+        for (Book b : dao.getAllBooks()) {
+            System.out.println(b);
+        }
     }
 }
