@@ -7,7 +7,7 @@ public class Member {
     private String name, email, phone;
     private LocalDate joinDate;
     private Status status;
-    enum Status {
+    public enum Status {
         ACTIVE,
         SUSPENDED
     }
