@@ -1,6 +1,6 @@
 # Library Management System
 
-A console-based application built with Core Java, JDBC, MySQL, and Maven. The project is being developed to practice database-backed application design and prepare for a Java backend internship.
+A console-based application built with Core Java, JDBC, MySQL, and Maven. The project is being developed to practice database-backed application design.
 
 ## Current development phase
 
