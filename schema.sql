@@ -20,7 +20,10 @@ CREATE TABLE books (
     isbn             VARCHAR(20) UNIQUE,
     total_copies     INT NOT NULL DEFAULT 1,
     available_copies INT NOT NULL DEFAULT 1,
-    created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT chk_copies_not_negative CHECK (total_copies >= 0 AND available_copies >= 0),
+    CONSTRAINT chk_available_within_total CHECK (available_copies <= total_copies)
 );
 
 -- ============================================
