@@ -2,6 +2,7 @@ package com.yax.library.ui;
 
 import com.yax.library.dao.BookDAO;
 import com.yax.library.dao.MemberDAO;
+import com.yax.library.dao.TransactionDAO;
 import com.yax.library.model.Book;
 import com.yax.library.model.Member;
 
@@ -17,7 +18,7 @@ public class Main {
 
     public static void main(String[] args) {
         boolean running = true;
-
+        System.out.println("Book Issued: " + new TransactionDAO().issueBook(1, 1));
         while (running) {
             printMenu();
             int choice = readInt("Choose an option: ");
@@ -49,7 +50,7 @@ public class Main {
         System.out.println("1. List all books");
         System.out.println("2. Add a book");
         System.out.println("3. Search books by title");
-        System.out.println("4. Update copies of a book");
+        System.out.println("4. Change total copies of a book");
         System.out.println("5. Delete a book");
         System.out.println("6. List all members");
         System.out.println("7. Add a member");
@@ -109,7 +110,7 @@ public class Main {
     }
 
     private static void updateBookCopies() {
-        int id = readInt("Enter book ID to update: ");
+        int id = readInt("Enter book ID: ");
         Book book = bookDAO.getBookById(id);
 
         if (book == null) {
@@ -117,15 +118,26 @@ public class Main {
             return;
         }
 
+        int borrowed = bookDAO.countActiveLoans(id);
+        if (borrowed < 0) {
+            System.out.println("Could not check how many copies are borrowed. Try again.");
+            return;
+        }
+
         System.out.println("Current: " + book);
+        System.out.println("Copies currently borrowed: " + borrowed);
+
         int newTotal = readInt("New total copies: ");
-        int newAvailable = readInt("New available copies: ");
+        if (newTotal < borrowed) {
+            System.out.println("Not allowed: " + borrowed + " copies are borrowed, so the total can't be less than " + borrowed + ".");
+            return;
+        }
 
-        book.setTotalCopies(newTotal);
-        book.setAvailableCopies(newAvailable);
-
-        boolean success = bookDAO.updateBook(book);
-        System.out.println(success ? "Updated!" : "Update failed.");
+        if (bookDAO.updateTotalCopies(id, newTotal)) {
+            System.out.println("Updated: " + bookDAO.getBookById(id));
+        } else {
+            System.out.println("Update failed.");
+        }
     }
 
     private static void deleteBook() {
