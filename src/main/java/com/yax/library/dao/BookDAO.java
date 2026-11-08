@@ -125,8 +125,7 @@ public class BookDAO {
      * Matches by book_id - the book must already exist.
      */
     public boolean updateBook(Book book) {
-        String sql = "UPDATE books SET title = ?, author = ?, genre = ?, isbn = ?, " +
-                "total_copies = ?, available_copies = ? WHERE book_id = ?";
+        String sql = "UPDATE books SET title = ?, author = ?, genre = ?, isbn = ?" + " WHERE book_id = ?";
 
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -135,9 +134,7 @@ public class BookDAO {
             stmt.setString(2, book.getAuthor());
             stmt.setString(3, book.getGenre());
             stmt.setString(4, book.getIsbn());
-            stmt.setInt(5, book.getTotalCopies());
-            stmt.setInt(6, book.getAvailableCopies());
-            stmt.setInt(7, book.getBookId());
+            stmt.setInt(5, book.getBookId());
 
             int rowsAffected = stmt.executeUpdate();
             return rowsAffected > 0;
@@ -192,31 +189,56 @@ public class BookDAO {
         return books;
     }
 
+    public int countActiveLoans(int bookId) {
+        String sql = "SELECT COUNT(*) FROM transactions WHERE book_id = ? AND return_date IS NULL";
+        int count = -999;
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setInt(1, bookId);
+
+            try(ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    count = rs.getInt(1);
+                }
+            }
+
+        } catch (SQLException e) {
+            System.out.println("Error counting loans for book: " + e.getMessage());
+        }
+        return count;
+    }
+
+    public boolean updateTotalCopies(int bookId, int newTotal) {
+        int activeLoanCount =  countActiveLoans(bookId);
+        if (activeLoanCount < 0 || newTotal < activeLoanCount) return false;
+        String sql = "UPDATE books SET " +
+                "total_copies = ?, available_copies = ? WHERE book_id = ?";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setInt(1, newTotal);
+            stmt.setInt(2, newTotal - activeLoanCount);
+            stmt.setInt(3, bookId);
+
+            return stmt.executeUpdate() > 0;
+
+        } catch (SQLException e) {
+            System.out.println("Error updating total copies for book: " + e.getMessage());
+        }
+        return false;
+    }
+
     public static void main(String[] args) {
-        BookDAO dao = new BookDAO();
+        BookDAO bdao = new BookDAO();
 
-        System.out.println("--- Search for 'the' ---");
-        List<Book> results = dao.searchBooksByTitle("the");
-        for (Book b : results) {
-            System.out.println(b);
-        }
+        Book book = bdao.getBookById(1);
 
-        System.out.println("\n--- Update book ID 4 ---");
-        Book book = dao.getBookById(4);
-        if (book != null) {
-            book.setTotalCopies(5);
-            book.setAvailableCopies(5);
-            boolean updated = dao.updateBook(book);
-            System.out.println("Update success: " + updated);
-            System.out.println(dao.getBookById(4));
-        }
+        System.out.println(book);
+        book.setAvailableCopies(99);
+        System.out.println(bdao.updateBook(book));
+        book = bdao.getBookById(1);
+        System.out.println(book);
 
-        System.out.println("\n--- Delete book ID 4 ---");
-        boolean deleted = dao.deleteBook(4);
-        System.out.println("Delete success: " + deleted);
-        System.out.println("Remaining books:");
-        for (Book b : dao.getAllBooks()) {
-            System.out.println(b);
-        }
     }
 }
