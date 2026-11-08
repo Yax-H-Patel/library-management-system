@@ -1,178 +1,116 @@
 # Library Management System
 
-A console-based application built with Core Java, JDBC, MySQL, and Maven. The project is being developed to practice database-backed application design.
+A console application for managing a small library's books and members, written in Core Java with JDBC and MySQL and built with Maven. It is a learning project for practising database-backed application design. Book and member management work from the console menu. Issuing and returning books are written in the data layer but are not yet available from the menu.
 
-## Current development phase
+## Tech stack
 
-**Book and member CRUD is implemented. Borrowing and returning books is in progress.**
+| Component | Version / detail |
+| --- | --- |
+| Java | 25 (`maven.compiler.source` and `maven.compiler.target` in `pom.xml`) |
+| Build | Maven (project version `1.0-SNAPSHOT`) |
+| JDBC driver | MySQL Connector/J (`com.mysql:mysql-connector-j`) 8.3.0 |
+| Database | MySQL 8. `pom.xml` does not pin a server version. `schema.sql` uses `DEFAULT (CURRENT_DATE)` and `CHECK` constraints, which need a recent MySQL 8.0 release. |
+| Interface | Text menu in the console |
 
-The console currently supports catalog and member management. The borrowing model and database table exist, but the issue/return DAO implementation is unfinished and is not connected to the console menu. This is a learning project under active development.
+There are no other dependencies and no test libraries.
 
 ## Features
 
-### Implemented
+- [x] List all books, ordered by title (menu 1)
+- [x] Add a book, showing its generated ID (menu 2)
+- [x] Search books by a word in the title (menu 3)
+- [x] Change a book's total copies (menu 4). Available copies are recalculated from active loans, and the total cannot go below the number of copies on loan.
+- [x] Delete a book (menu 5)
+- [x] List all members (menu 6)
+- [x] Add a member; the join date is today and the status is `ACTIVE` (menu 7)
+- [x] Update a member's name, email or phone number (menu 8)
+- [x] Delete a member (menu 9)
+- [ ] Issue a book to a member
+- [ ] Return a book, with a late fine
+- [ ] List all loans or active loans
+- [ ] Edit a book's title, author, genre or ISBN
+- [ ] Change a member's status (`ACTIVE` / `SUSPENDED`)
+- [ ] Librarian / admin login
+- [ ] Overdue reports
 
-- List all books, ordered by title.
-- Add books and retrieve their generated IDs.
-- Search books by a title keyword.
-- Update a book's total and available copy counts.
-- Delete books, subject to database foreign-key constraints.
-- List and register members.
-- Update member names, email addresses, and phone numbers.
-- Delete members, subject to database foreign-key constraints.
-- Persist data using JDBC prepared statements and MySQL.
-
-The book DAO also supports updating title, author, genre, and ISBN. The console currently exposes only copy-count updates. Member status is represented in the model and database, but changing it is not exposed in the console.
-
-### In progress
-
-- Issue and return operations in `TransactionDAO`.
-- Consistent inventory updates when a book is borrowed or returned.
-- Database transaction handling for borrowing operations.
-
-The current `Transaction` model assigns a 21-day borrowing period. Issue and return operations are not yet usable end to end.
-
-### Planned
-
-- Active loan lists and member borrowing history.
-- Overdue tracking and fine calculation.
-- Admin/librarian login; the `users` table is already defined.
-- Input validation, clearer error handling, and automated tests.
-
-## Technology stack
-
-| Component | Current configuration |
-| --- | --- |
-| Java | JDK 25, matching the source and target levels in `pom.xml` |
-| Build | Maven |
-| Database | MySQL 8; the schema uses expression defaults |
-| Database access | JDBC |
-| JDBC driver | MySQL Connector/J 8.3.0 |
-| Interface | Interactive console |
+The issue, return and loan-listing features exist in `TransactionDAO` but are not in the menu. Issuing checks that copies are available and that the member is not suspended, and sets a due date 21 days after the issue date. Returning charges 2.5 per day late. Editing book details exists as `BookDAO.updateBook` and is not in the menu either. The model, DAO and database all support member status, but nothing in the console changes it. Login exists only as the `users` table.
 
 ## Project structure
 
 ```text
-library-management-system/
-├── pom.xml
-├── schema.sql
-├── src/main/java/com/yax/library/
-│   ├── model/
-│   │   ├── Book.java
-│   │   ├── Member.java
-│   │   └── Transaction.java
-│   ├── dao/
-│   │   ├── BookDAO.java
-│   │   ├── MemberDAO.java
-│   │   └── TransactionDAO.java    # Work in progress
-│   ├── util/
-│   │   └── DBConnection.java
-│   └── ui/
-│       └── Main.java             # Application entry point
-├── src/main/resources/
-│   └── db.properties             # Local database configuration
-└── src/test/java/                # No automated tests yet
+src/main/java/com/yax/library/
+├── model/   Book, Member, Transaction: plain objects holding one row's data
+├── dao/     BookDAO, MemberDAO, TransactionDAO: all SQL; turn rows into model objects
+├── util/    DBConnection: reads db.properties and opens JDBC connections
+└── ui/      Main: the console menu and input handling (entry point)
 ```
 
-The console calls DAOs directly. DAOs execute SQL and map database rows to model objects. `DBConnection` loads connection settings from the classpath. A service layer for business rules and transaction coordination is a planned improvement.
+The project root also holds `pom.xml` and `schema.sql`. Database settings go in `src/main/resources/db.properties`, which you create yourself (see Setup) and which `.gitignore` excludes.
 
-## Setup and running
+## Setup
 
-### 1. Install prerequisites
+### 1. Create the database
 
-- JDK 25.
-- Maven available on your `PATH`.
-- A running MySQL server and the `mysql` command-line client.
-
-Run the following commands from the project root to check your Java and Maven installations:
-
-```powershell
-java -version
-mvn -version
-```
-
-### 2. Initialize the database
-
-**`schema.sql` drops and recreates the application's tables. Run it only against a development database whose existing data can be discarded.** It inserts three sample books and two sample members.
-
-From the project root, open the MySQL client using an account with database creation permissions:
-
-```powershell
-mysql -u root -p
-```
-
-Then run:
+In the MySQL client:
 
 ```sql
 CREATE DATABASE IF NOT EXISTS library_db;
-SOURCE schema.sql;
 ```
 
-The database must be created first because `schema.sql` starts with `USE library_db`.
+`schema.sql` starts with `USE library_db`, so the database must exist first.
 
-For application access, create a dedicated user rather than using the administrator account. Replace the password placeholder before executing:
+### 2. Run schema.sql
 
-```sql
-CREATE USER 'library_app'@'localhost' IDENTIFIED BY 'replace-with-your-local-password';
-GRANT SELECT, INSERT, UPDATE, DELETE ON library_db.* TO 'library_app'@'localhost';
-EXIT;
+> **Warning:** `schema.sql` DROPS the `transactions`, `books`, `members` and `users` tables and creates them again. Any data already in them is deleted. Run it only when you are happy to lose that data.
+
+From the project root:
+
+```sh
+mysql -u root -p library_db < schema.sql
 ```
 
-If an application user already exists, use its credentials instead.
+It also inserts three sample books and two sample members.
 
-### 3. Configure the database connection
+### 3. Create db.properties
 
-Create or edit `src/main/resources/db.properties`:
+Create `src/main/resources/db.properties` with these three keys, replacing the placeholder values with your own:
 
 ```properties
 db.url=jdbc:mysql://localhost:3306/library_db
-db.user=library_app
-db.password=replace-with-your-local-password
+db.user=your_mysql_user
+db.password=your_mysql_password
 ```
 
-`DBConnection` requires this file on the classpath. Adjust the host, port, and credentials for your local server.
+`DBConnection` loads this file from the classpath and stops with "db.properties not found on classpath" if the file is missing. Do not commit it.
 
-Keep real credentials out of version control. Although `.gitignore` contains a rule for `db.properties`, an already tracked file remains tracked. Maven also copies this resource into build output, so keep generated artifacts containing local credentials private.
+### 4. Run the app
 
-### 4. Build and start the console
+`pom.xml` does not configure a way to run the app, so open the project in your IDE as a Maven project, set the JDK to 25, and run `com.yax.library.ui.Main`.
 
-Build the classes and copy runtime dependencies:
+Note: `Main` currently issues book 1 to member 1 every time it starts (see Known limitations).
 
-```powershell
-mvn compile dependency:copy-dependencies
-```
+## Database design
 
-On Windows PowerShell:
+- **books**: the catalogue. Each book has a unique ISBN plus `total_copies` and `available_copies`.
+- **members**: library members. Each has a unique email, a join date, and a status of `ACTIVE` or `SUSPENDED`.
+- **transactions**: one row per loan, linking a book to a member, with issue date, due date, return date (`NULL` while the book is still out) and fine. `book_id` and `member_id` are foreign keys. They have no `ON DELETE` rule, so a book or member that has any loan history cannot be deleted. Through this table, books and members have a many-to-many relationship.
+- **users**: usernames, password hashes and roles (`ADMIN` / `LIBRARIAN`) for a future login. No other table refers to it and no code uses it yet.
 
-```powershell
-java -cp "target/classes;target/dependency/*" com.yax.library.ui.Main
-```
+## Design notes
 
-On macOS or Linux, use `:` as the classpath separator:
+- **Layers.** `model` holds data, `dao` holds all SQL, and `ui` holds all console input and output. The UI calls the DAOs directly; there is no service layer. Each DAO method opens its own connection through `DBConnection`.
+- **Prepared statements.** Every query uses `PreparedStatement` with `?` placeholders, so user input never becomes part of the SQL text.
+- **JDBC transactions.** `issueBook` and `returnBook` switch off auto-commit, update both the `books` row and the `transactions` row, then commit, rolling back if either step fails. The inventory updates are conditional (`available_copies > 0` when issuing, `available_copies < total_copies` when returning). A return of a loan that was already returned changes no rows and is rolled back.
+- **CHECK constraints.** The `books` table requires both copy counts to be zero or more, and available copies to be no more than total copies. The database therefore refuses bad counts even if the Java code has a bug.
 
-```sh
-java -cp "target/classes:target/dependency/*" com.yax.library.ui.Main
-```
+## Known limitations
 
-Alternatively, import the project into IntelliJ IDEA as a Maven project, select JDK 25, and run `com.yax.library.ui.Main`.
-
-## Console options
-
-| Option | Action |
-| --- | --- |
-| 1 | List all books |
-| 2 | Add a book |
-| 3 | Search books by title |
-| 4 | Update copies of a book |
-| 5 | Delete a book |
-| 6 | List all members |
-| 7 | Add a member |
-| 8 | Update a member |
-| 9 | Delete a member |
-| 0 | Exit |
-
-## Next development priorities
-
-1. Complete and test issue/return workflows, with a service layer, shared JDBC transactions, member eligibility checks, and safe inventory updates.
-2. Add active loan/history queries, overdue reports, and fine calculation using decimal monetary values.
-3. Strengthen validation and error handling, add automated tests, and make database setup reproducible before exposing the services through a REST API.
+- `Main` has a leftover test line that calls `issueBook(1, 1)` at startup, so every launch creates a real loan and lowers book 1's available copies.
+- Issue, return and loan listing are not in the console menu.
+- There are no automated tests (no `src/test` folder or test dependencies). `BookDAO` and `MemberDAO` have `main` methods used for manual testing, and these write to whatever database `db.properties` points at.
+- There is no login, even though the `users` table exists.
+- Members are never suspended automatically (for example for overdue books or unpaid fines). The status can only be changed directly in the database.
+- Deleting a book or member with loan history fails because of the foreign keys, and the console then wrongly says the ID does not exist.
+- Input checking is minimal. A blank ISBN is saved as an empty string, so a second book without an ISBN fails the unique constraint. Negative copy counts are stopped only by the database's CHECK constraints.
+- Changing total copies counts loans and updates the book in two separate steps rather than one transaction.
+- Fines are calculated as a Java `double`, while the database column is `DECIMAL(6,2)`.
